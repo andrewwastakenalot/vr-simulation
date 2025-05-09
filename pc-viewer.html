@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PC Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script>
+        class PCViewer {
+            constructor() {
+                this.players = new Map();
+                this.initScene();
+                this.initNetwork();
+            }
+
+            initScene() {
+                // Scene setup
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(this.renderer.domElement);
+
+                // Camera controls
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.camera.position.set(0, 10, 20);
+                this.controls.update();
+
+                // Lighting
+                const light = new THREE.DirectionalLight(0xffffff, 1);
+                light.position.set(5, 5, 5);
+                this.scene.add(light);
+            }
+
+            initNetwork() {
+                this.ws = new WebSocket('wss://[YOUR_GLITCH_URL]');
+                
+                this.ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    
+                    if(!this.players.has(data.id)) {
+                        // Create new player avatar
+                        const geometry = new THREE.BoxGeometry(0.5, 1.8, 0.5);
+                        const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+                        const player = new THREE.Mesh(geometry, material);
+                        this.scene.add(player);
+                        this.players.set(data.id, player);
+                    }
+
+                    // Update position
+                    const player = this.players.get(data.id);
+                    player.position.set(data.x, data.y, data.z);
+                    player.rotation.fromArray(data.rotation);
+                };
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        const viewer = new PCViewer();
+        viewer.animate();
+    </script>
+</body>
+</html>
