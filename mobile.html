@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mobile VR Client</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        /* Enhanced touch controls */
+        body { margin: 0; overflow: hidden; touch-action: none; }
+        #controls { position: fixed; bottom: 20px; width: 200px; height: 200px; left: 50%; transform: translateX(-50%); }
+        .joystick { 
+            position: absolute; 
+            width: 60px; height: 60px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            border: 2px solid white;
+            touch-action: none;
+        }
+        #moveStick { left: 20px; bottom: 20px; }
+        #lookStick { right: 20px; bottom: 20px; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script>
+        class VRClient {
+            constructor() {
+                // WebSocket Connection
+                this.ws = new WebSocket('wss://[https://global-future-caution.glitch.me/]');
+                
+                // Three.js Setup
+                this.initScene();
+                this.initControls();
+                this.initNetwork();
+            }
+
+            initScene() {
+                // Scene configuration
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(this.renderer.domElement);
+
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+                this.scene.add(ambientLight);
+                
+                // Floor grid
+                const grid = new THREE.GridHelper(50, 50, 0x444444, 0x888888);
+                this.scene.add(grid);
+            }
+
+            initControls() {
+                // Touch controls
+                const movePad = document.createElement('div');
+                movePad.id = 'moveStick';
+                movePad.className = 'joystick';
+                document.body.appendChild(movePad);
+
+                const lookPad = document.createElement('div');
+                lookPad.id = 'lookStick';
+                lookPad.className = 'joystick';
+                document.body.appendChild(lookPad);
+
+                // Hammer.js for touch gestures
+                new Hammer(movePad).on('pan', (ev) => {
+                    this.handleMove(ev.deltaX, ev.deltaY);
+                });
+                
+                new Hammer(lookPad).on('pan', (ev) => {
+                    this.handleLook(ev.deltaX, ev.deltaY);
+                });
+            }
+
+            initNetwork() {
+                // WebSocket handlers
+                this.ws.onopen = () => {
+                    console.log('Connected to server');
+                    this.playerId = Math.random().toString(36).substr(2, 9);
+                };
+
+                this.ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    // Update other players...
+                };
+            }
+
+            handleMove(x, y) {
+                // Movement logic
+                const moveSpeed = 0.1;
+                this.camera.position.x += x * moveSpeed;
+                this.camera.position.z += y * moveSpeed;
+            }
+
+            handleLook(x, y) {
+                // Rotation logic
+                const lookSpeed = 0.005;
+                this.camera.rotation.y -= x * lookSpeed;
+                this.camera.rotation.x -= y * lookSpeed;
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.renderer.render(this.scene, this.camera);
+                
+                // Send position updates
+                if(this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        id: this.playerId,
+                        x: this.camera.position.x,
+                        y: this.camera.position.y,
+                        z: this.camera.position.z,
+                        rotation: this.camera.rotation.toArray()
+                    }));
+                }
+            }
+        }
+
+        // Initialize client
+        const client = new VRClient();
+        client.animate();
+
+        // Window resize handler
+        window.addEventListener('resize', () => {
+            client.camera.aspect = window.innerWidth / window.innerHeight;
+            client.camera.updateProjectionMatrix();
+            client.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
